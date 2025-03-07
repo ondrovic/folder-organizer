@@ -1,0 +1,6 @@
+project:
+  testing:
+    ☐ write tests
+  .github:
+    workflows:
+      ☐ verify everything is setup
