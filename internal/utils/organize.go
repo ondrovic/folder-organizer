@@ -332,6 +332,15 @@ func worker(jobs <-chan types.FileJob, wg *sync.WaitGroup, stats *types.Stats) {
 	defer wg.Done()
 
 	for job := range jobs {
+		// Check if the source and target paths are the same or already in correct structure
+		targetPath := filepath.Join(job.TargetDir, job.Filename)
+		if strings.HasPrefix(job.SourcePath, job.TargetDir) {
+			// File is already in the correct directory structure
+			stats.IncrementProcessed()
+			stats.IncrementSkipped()
+			continue
+		}
+
 		// Ensure the target directory exists
 		err := os.MkdirAll(job.TargetDir, 0755)
 		if err != nil {
@@ -341,11 +350,9 @@ func worker(jobs <-chan types.FileJob, wg *sync.WaitGroup, stats *types.Stats) {
 			continue
 		}
 
-		// Create the target file path
-		targetPath := filepath.Join(job.TargetDir, job.Filename)
-
-		// Check if the target file already exists
-		if _, err := os.Stat(targetPath); err == nil {
+		// Only rename if the target file actually exists and has the same name
+		// This is to prevent unnecessary renaming
+		if _, err := os.Stat(targetPath); err == nil && targetPath != job.SourcePath {
 			// File already exists, append a number to the filename
 			ext := filepath.Ext(job.Filename)
 			baseName := strings.TrimSuffix(job.Filename, ext)
@@ -358,6 +365,13 @@ func worker(jobs <-chan types.FileJob, wg *sync.WaitGroup, stats *types.Stats) {
 				}
 				counter++
 			}
+		}
+
+		// Skip if source and target are the same file
+		if filepath.Clean(job.SourcePath) == filepath.Clean(targetPath) {
+			stats.IncrementProcessed()
+			stats.IncrementSkipped()
+			continue
 		}
 
 		// Move the file using os.Rename which is more efficient
